@@ -131,15 +131,80 @@ At realistic prevalence either model would bury analysts in false alarms if it s
 
 ## Step 4: LLM evaluation harness
 
-*(to come)*
+**Contestants.** The fine-tuned DistilBERT is the incumbent. Against it, two LLMs:
+
+- **A small commercial API model**, for example Claude Haiku or GPT-5.4 mini.
+- **A self-hosted open-weight model**, for example a 7–14B Llama or Qwen served with vLLM.
+
+That pairing tests commercial against open-source, and it brings data privacy into the comparison.
+
+**Setup**
+
+- **The same frozen test split as Step 2.** Prompts are iterated on validation only; test is never used for prompt work.
+- **The prompt is the Step 3 labelling guideline, verbatim**, the same text a human annotator gets. The tweet goes inside delimiters and is treated as data, never as instructions.
+- **Zero-shot and a fixed 6-example few-shot variant.** Measure whether few-shot helps rather than assume it.
+- **Structured JSON output** `{label, confidence, reason_code}` through the provider's schema mode, at temperature 0, recording the exact model version.
+- **A score for thresholding.**
+  - Best: label-token log-probabilities where the API exposes them.
+  - Otherwise: the model's stated confidence (check its calibration) or the vote share across 5 samples (5× the cost).
+  - Without a score, only one operating point can be compared, and average precision can't be computed.
+
+**What to measure.** The Step 1 metrics on the same tweets (average precision, recall at precision ≥ 0.80, F2, Brier and reliability, expected cost), plus:
+
+- **Paired comparison with the fine-tune:** McNemar's test and paired bootstrap intervals on each difference.
+- **Agreement with corrected labels:** score each model against a relabelled subset as well, since Step 3 showed the dataset's labels are noisy and narrower than the product's definition.
+- **Reliability:** invalid-output and refusal rate; agreement across 3 repeat runs and 2 prompt paraphrases.
+- **Operations:** latency at p50 and p95, throughput under rate limits, and cost per 1,000 tweets from real token counts (GPU-hours for the self-hosted model).
+- **Robustness:** a small adversarial set with prompt-injection text inside tweets, spam hashtags, and non-English or code-switched tweets.
+- **Compliance:** the provider's data-retention and no-training terms and its processing region. The self-hosted model keeps data in-house.
+
+**Deciding whether an LLM is worth its cost**
+
+1. Hold the operating constraint fixed: analysts' queue at precision ≥ 0.80.
+2. At that constraint, measure the extra true positives per 1,000 tweets over the fine-tune, with a bootstrap interval. Require McNemar p < 0.05 on the tweets where the two disagree.
+3. Compute the **cost per additional true positive** = extra cost per 1,000 tweets ÷ extra true positives per 1,000 tweets. Compare it with what a caught incident is worth, a number to get from analysts and product. Also require p95 latency to fit the alerting SLA.
+4. If an LLM clears that bar, deploy it as a **cascade adjudicator**. The fine-tune scores everything, and only the uncertain band around its threshold goes to the LLM. Tune that band to a few percent of traffic, then evaluate the whole cascade end to end, not the LLM alone. Step 3's genuine model errors were all near the threshold, which is exactly the band an adjudicator would see.
+
+**Back-of-envelope at AlertMedia's scale.** AlertMedia cites 15M+ records a day. Assume about 300 input and 10 output tokens per tweet (guideline plus tweet), or 4.5B input and 150M output tokens a day. At list prices as published in November 2026 (verify before quoting):
+
+| Model (input / output price per 1M tokens) | Every tweet | Cascade, 5% of tweets |
+| --- | --- | --- |
+| [GPT-5.4 mini](https://openai.com/index/introducing-gpt-5-4-mini-and-nano/) ($0.75 / $4.50) | ~$4,050/day (~$1.5M/year) | ~$200/day |
+| [Claude Haiku 4.5](https://www.anthropic.com/news/claude-haiku-4-5) ($1 / $5) | ~$5,250/day (~$1.9M/year) | ~$260/day |
+
+Batch APIs halve the price but add hours of delay, which rules them out for alerting. Reasoning models can bill hidden reasoning tokens, so these are lower bounds. The fine-tune costs a small fraction of this per tweet, and its latency is milliseconds. My expectation going in: an LLM may roughly match the fine-tune on this binary task, so the decision turns on cost, latency and calibration, which is why the cascade is the default design.
 
 ## Step 5: Two-week plan
 
-*(to come)*
+Order: settle the definition before measuring, measure before modelling, and have monitoring in place before spending on LLMs.
+
+| # | What I'd do | Stop when | Change course if |
+| --- | --- | --- | --- |
+| 1 | **Agree the definition and build a gold evaluation set from real traffic.** With 2–3 analysts, turn the Step 3 guideline into a one-page labelling guide by alert type, settling crime, evacuations and after-the-fact reports. Label 1,000–2,000 records sampled across sources *and across current scores, including low ones*, or recall can't be measured. Double-label an overlap set. | Annotator agreement κ ≥ 0.7 and about 300+ positives, enough to estimate recall within about ±5 points | κ < 0.6 after two guideline revisions: then the problem is the definition, which goes to product, not to modelling |
+| 2 | **Baseline the current production system on that set**, sliced by source, alert type, language and region. Measure analyst queue volume and minutes per alert, to replace my 0.80 floor and 10:1 cost ratio with real numbers. | Metrics with intervals for the main slices, plus measured costs per false positive and per miss | Production already meets the target within its interval on every major slice: then skip new modelling and look elsewhere |
+| 3 | **Error taxonomy and label cleanup.** Review production's misses first, then false alarms, with analysts. Run confident learning over the training data to queue likely mislabels; Step 3's most confident "misses" were all mislabeled. | About 50 consecutive errors add no new category, or the top 3 categories cover ≥ 70% of errors | Errors are mostly definition disputes: then go back to item 1 |
+| 4 | **Calibrate, set thresholds per alert type, and run the candidate in shadow mode.** The candidate is the fine-tune retrained on cleaned labels; it scores live traffic without affecting what is sent. Monitor score drift, alerts per hour, latency, and disagreements with production, which analysts review in samples. | Promote: higher recall at equal queue volume, with non-overlapping intervals over an agreed window (for example, 7 days) | Kill: no significant gain after the planned number of reviewed disagreements, or latency or alert volume breaks the SLA |
+| 5 | **Pilot the LLM cascade on the uncertain band** with the Step 4 harness: commercial vs. self-hosted open-weight, plus a privacy and compliance review. | It clears every Step 4 bar, then moves to an analyst A/B or interleaved trial | Stop: cost per extra true positive exceeds the agreed value, no significant gain on disagreements, p95 latency breaks the SLA, or invalid outputs exceed about 1% |
 
 ## Optional: grouping tweets into events
 
-*(to come)*
+Not implemented, and it can't be evaluated on this dataset, which has no timestamps.
+
+**Approach**
+
+1. **Represent each flagged tweet** by a sentence embedding, the entities and places extracted from its text (named-entity recognition plus geocoding; the profile `location` field is unreliable), and its timestamp.
+2. **Cluster online.** Assign each new tweet to the nearest active event in a sliding window (for example, 6–24 hours) if its similarity clears a threshold *and* its location and entities are compatible; otherwise open a new event.
+   - Geography is a strong prior: two "fire" tweets 500 km apart are two events.
+   - Periodically merge events whose centers converge.
+3. **Make it fast at 15M records a day** with an approximate nearest-neighbour index, such as Elasticsearch or OpenSearch vector search, or locality-sensitive hashing as in streaming first-story detection (Petrović, Osborne and Lavrenko, 2010).
+
+**How I'd know it works**
+
+- **Offline:** analysts assign event IDs to a sample. Score with B-cubed precision and recall and the adjusted Rand index, and track two errors separately:
+  - **Merges** (two incidents fused into one) are worse for alerting, because one incident hides another.
+  - **Splits** (one incident fragmented) cause duplicate alerts.
+- **Tuning:** set the similarity threshold and time window on that sample to keep merges under a ceiling, accepting some splits.
+- **Online:** alerts per incident fall without any missed incidents; time from an event's first tweet to its first alert; weekly analyst spot checks.
 
 ## How to run
 
@@ -177,3 +242,8 @@ I used Claude (Anthropic) as a research assistant and pair programmer. Running l
   - Fine-tune on my iMac's GPU rather than in Colab.
   - Error-analysis guideline, including counting unplanned evacuations as 1, and my blind labels for the ten errors. Claude chose and shuffled the ten by the rule above and hid their labels and scores. I labelled them, Claude computed the verdicts from my labels, and I chose to leave #6 "unsure".
 - **§4 code and Step 3 text.** Claude drafted the selection and review cells and the Step 3 write-up from my labels and reasons.
+- **Steps 4, 5 and the event-grouping sketch.** Claude drafted these from the earlier research and the choices below. The API prices come from the providers' pages as of November 2026.
+  - Compare a commercial API model with a self-hosted open-weight model.
+  - Use an LLM, if it earns its cost, as a cascade adjudicator on the uncertain band.
+  - Start the real-system plan with the definition and a gold evaluation set.
+  - Include the optional event-grouping sketch.
