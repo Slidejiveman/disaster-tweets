@@ -53,27 +53,37 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 **Results on the held-out test set** (1,036 tweets; thresholds chosen on validation for precision ≥ 0.80; 95% bootstrap intervals):
 
-| Metric | TF-IDF + LR | Fine-tuned DistilBERT |
-| --- | --- | --- |
-| Average precision | 0.853 [0.823, 0.879] | *(pending run)* |
-| ROC-AUC | 0.864 [0.839, 0.886] | |
-| Precision at operating point | 0.786 [0.744, 0.824] | |
-| Recall at operating point | 0.722 [0.678, 0.763] | |
-| F2 | 0.734 [0.697, 0.771] | |
-| F1 | 0.752 [0.718, 0.783] | |
-| Brier score (lower is better) | 0.140 [0.129, 0.152] | |
-| Expected cost per 1,000 tweets | 1,209 [1,025, 1,402] | |
-| Alerts per 1,000 tweets | 374 | |
+| Metric | TF-IDF + LR | Fine-tuned DistilBERT | Difference (paired bootstrap) |
+| --- | --- | --- | --- |
+| Average precision | 0.853 [0.823, 0.879] | **0.882** [0.857, 0.904] | +0.029 [+0.013, +0.044] |
+| ROC-AUC | 0.864 [0.839, 0.886] | **0.888** [0.866, 0.907] | |
+| Recall at operating point | 0.722 [0.678, 0.763] | **0.781** [0.740, 0.818] | +0.059 [+0.026, +0.092] |
+| Precision at operating point | 0.786 [0.744, 0.824] | 0.816 [0.780, 0.851] | +0.031 [−0.006, +0.066] |
+| F2 | 0.734 [0.697, 0.771] | **0.788** [0.752, 0.820] | +0.054 [+0.026, +0.083] |
+| F1 | 0.752 [0.718, 0.783] | **0.799** [0.769, 0.825] | |
+| Brier score (lower is better) | 0.140 [0.129, 0.152] | **0.120** [0.107, 0.134] | |
+| Expected cost per 1,000 tweets | 1,209 [1,025, 1,402] | **959** [805, 1,128] | −250 [−383, −115] |
+| Alerts per 1,000 tweets | 374 | 389 | |
+
+**The improvement is real.** Every difference except precision has an interval that excludes zero. Precision is held near the 0.80 floor by design, so it isn't expected to move much. On the paired predictions, McNemar's exact test gives p = 0.0045: the fine-tuned model alone is right on 85 test tweets, the baseline alone on 51. The +4.7 F1 matches the 4–5 points reported in published work on this data.
+
+**What it means for an analyst queue.** At the same precision floor, per 1,000 tweets at this data's prevalence, the fine-tuned model flags about 318 real disasters against the baseline's 293, and about 71 false alarms against 80. So it catches roughly **24 more real events while sending analysts 9 fewer false alarms**.
+
+**Cost of the improvement.** Training took 154 seconds on my iMac's Apple Silicon GPU. Validation average precision by epoch was 0.885, 0.890 and 0.889, so the notebook kept epoch 2. Inference is milliseconds per tweet, so serving cost is negligible next to an LLM (Step 4).
+
+**Calibration.** The fitted temperature was 1.10, so the fine-tuned model was only slightly overconfident, and its Brier score is better than the baseline's. Both models track the diagonal of the reliability plot (`results/pr_reliability.png`) reasonably well.
+
+**Where the curves meet.** Above about 90% recall the two precision-recall curves converge: the last disasters to be caught are hard for both models. Step 3 looks at why.
 
 **Precision at real-world prevalence** (holding each model's test recall and false-positive rate fixed):
 
 | Prevalence | TF-IDF + LR | Fine-tuned DistilBERT |
 | --- | --- | --- |
-| 10% | 0.373 | |
-| 5% | 0.220 | |
-| 1% | 0.051 | |
+| 10% | 0.373 | 0.419 |
+| 5% | 0.220 | 0.255 |
+| 1% | 0.051 | 0.062 |
 
-*(Comparison and interpretation after the fine-tune run.)*
+At realistic prevalence either model would bury analysts in false alarms if it scored an unfiltered feed. That supports using it as a second stage after keyword and source filtering, and setting thresholds on representative live traffic rather than on this dataset (Step 5).
 
 **A note on the operating point.** The baseline's threshold was chosen on validation to reach precision 0.80, and on test it lands at 0.786, with an interval that still includes 0.80. A threshold tuned on one sample drifts on the next, which is why production needs monitoring and periodic recalibration (Step 5).
 
@@ -103,7 +113,14 @@ pip install -r requirements.txt
 jupyter lab pipeline.ipynb      # then Run > Run All Cells
 ```
 
-The first run downloads the dataset from Hugging Face into `data/`. *(Fine-tuning details to come.)*
+To run it headless and save the outputs into the notebook:
+
+```bash
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=-1 pipeline.ipynb
+```
+
+- The first run downloads the dataset from Hugging Face into `data/`.
+- **Fine-tuning is skipped by default.** The fine-tuned model's validation and test predictions are committed in `results/finetune_predictions.csv`, so the notebook reproduces every number without a GPU. To retrain, set `FORCE_RETRAIN = True` in §3b. It then downloads DistilBERT (about 270 MB) and trains in about 2.5 minutes on an Apple Silicon GPU; it also runs on CUDA or, slowly, on CPU.
 
 ## AI tool use
 
@@ -113,8 +130,10 @@ I used Claude (Anthropic) as a research assistant and pair programmer. Running l
 - **Data inspection.** Through the Hugging Face connector, Claude found that the dataset is a single zip and confirmed it matches Kaggle's files.
 - **§0–§1 code.** Claude drafted the loading, normalization, deduplication and grouped-split cells.
 - **§2 code and Step 1 text.** Claude drafted the evaluation harness and the Step 1 write-up from the choices below.
+- **§3 code and Step 2 text.** Claude drafted the baseline, fine-tuning and comparison cells, testing all but the fine-tune in its own environment. I ran the full notebook on my iMac, which produced every number above, and Claude drafted the Step 2 write-up from those results.
 - **My decisions:**
   - Resolve conflicting labels by majority vote and drop exact ties.
   - Operating point: recall at precision ≥ 0.80, chosen on validation.
   - Cost ratio: a missed disaster = 10 false alarms.
   - Report precision at 1%, 5% and 10% prevalence rather than assume one rate.
+  - Fine-tune on my iMac's GPU rather than in Colab.

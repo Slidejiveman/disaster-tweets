@@ -1,6 +1,6 @@
 {
   "TF-IDF + LR": {
-    "threshold": 0.4699123861471976,
+    "threshold": 0.46991238614719644,
     "avg_precision": {
       "value": 0.8534,
       "ci_low": 0.8232,
