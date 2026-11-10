@@ -2,7 +2,7 @@
 
 AlertMedia take-home, Sr AI/ML Engineer · Ryder Dale Walton
 
-> **Summary** *(written last)*
+> **Summary.** A fine-tuned DistilBERT beats a TF-IDF + logistic regression baseline. At the same 80% precision floor, it catches about 24 more real disasters per 1,000 tweets and sends analysts 9 fewer false alarms (recall 0.781 vs. 0.722, average precision 0.882 vs. 0.853, McNemar p = 0.0045). But the error analysis says the bigger lever is the data. The model's most confident "misses" were mislabeled, and its most confident "false alarms" were real incidents that the dataset's definition leaves out. So the two-week plan starts with an analyst-agreed definition and a gold evaluation set from real traffic. An LLM comes in only as a cascade adjudicator on uncertain tweets, where it has to justify its cost per extra true positive caught.
 
 All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebook with their results; this README summarizes them and holds Steps 4 and 5.
 
@@ -43,7 +43,7 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 **Real-world prevalence.** This data is 41% disasters only because every tweet was found by a disaster-keyword search. Holding a model's recall and false-positive rate fixed, precision at prevalence π is recall·π / (recall·π + FPR·(1−π)). For example, 80% recall with a 10% false-positive rate gives 47% precision at 10% prevalence, 30% at 5%, and 7.5% at 1%. Step 2 reports this for both models.
 
-**Sanity check.** Each tweet's keyword alone, scored by that keyword's disaster rate in train, reaches an average precision of 0.758 on validation (chance is 0.408). Any real model has to clear that bar, and Step 3 checks how much the models lean on the same shortcut.
+**Sanity check.** Each tweet's keyword alone, scored by that keyword's disaster rate in train, reaches an average precision of 0.758 on validation (chance is 0.408). Any real model has to clear that bar; both in Step 2 do so comfortably.
 
 ## Step 2: Baseline and one improvement
 
@@ -69,7 +69,7 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 **What it means for an analyst queue.** At the same precision floor, per 1,000 tweets at this data's prevalence, the fine-tuned model flags about 318 real disasters against the baseline's 293, and about 71 false alarms against 80. So it catches roughly **24 more real events while sending analysts 9 fewer false alarms**.
 
-**Cost of the improvement.** Training took 154 seconds on my iMac's Apple Silicon GPU. Validation average precision by epoch was 0.885, 0.890 and 0.889, so the notebook kept epoch 2. Inference is milliseconds per tweet, so serving cost is negligible next to an LLM (Step 4).
+**Cost of the improvement.** Training took 154 seconds on my iMac's Apple Silicon GPU. Validation average precision by epoch was 0.885, 0.890 and 0.889, so the notebook kept epoch 2. Serving is one small-model forward pass per tweet, a small fraction of an LLM's per-tweet cost (Step 4); I'd measure its latency in shadow mode (Step 5).
 
 **Calibration.** The fitted temperature was 1.10, so the fine-tuned model was only slightly overconfident, and its Brier score is better than the baseline's. Both models track the diagonal of the reliability plot (`results/pr_reliability.png`) reasonably well.
 
@@ -172,7 +172,7 @@ That pairing tests commercial against open-source, and it brings data privacy in
 | [GPT-5.4 mini](https://openai.com/index/introducing-gpt-5-4-mini-and-nano/) ($0.75 / $4.50) | ~$4,050/day (~$1.5M/year) | ~$200/day |
 | [Claude Haiku 4.5](https://www.anthropic.com/news/claude-haiku-4-5) ($1 / $5) | ~$5,250/day (~$1.9M/year) | ~$260/day |
 
-Batch APIs halve the price but add hours of delay, which rules them out for alerting. Reasoning models can bill hidden reasoning tokens, so these are lower bounds. The fine-tune costs a small fraction of this per tweet, and its latency is milliseconds. My expectation going in: an LLM may roughly match the fine-tune on this binary task, so the decision turns on cost, latency and calibration, which is why the cascade is the default design.
+Batch APIs halve the price but add hours of delay, which rules them out for alerting. Reasoning models can bill hidden reasoning tokens, so these are lower bounds. The fine-tune costs a small fraction of this per tweet. My expectation going in: an LLM may roughly match the fine-tune on this binary task, so the decision turns on cost, latency and calibration, which is why the cascade is the default design.
 
 ## Step 5: Two-week plan
 
@@ -208,7 +208,7 @@ Not implemented, and it can't be evaluated on this dataset, which has no timesta
 
 ## How to run
 
-Tested on macOS (Apple Silicon) with Python 3.11+.
+Run on macOS (Apple Silicon); needs Python 3.10 or newer.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -227,23 +227,24 @@ jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeou
 
 ## AI tool use
 
-I used Claude (Anthropic) as a research assistant and pair programmer. Running log, updated as the work goes:
+I used Claude (Anthropic) as a research assistant and pair programmer. Every number in this README comes from my own run of the notebook on my iMac, except where a source is cited.
 
-- **Research.** Claude's research mode surveyed the dataset's provenance, published baselines on this data, the metric literature, and LLM API prices. I used it to plan; every number in this README comes from my own runs unless cited.
-- **Data inspection.** Through the Hugging Face connector, Claude found that the dataset is a single zip and confirmed it matches Kaggle's files.
-- **§0–§1 code.** Claude drafted the loading, normalization, deduplication and grouped-split cells.
-- **§2 code and Step 1 text.** Claude drafted the evaluation harness and the Step 1 write-up from the choices below.
-- **§3 code and Step 2 text.** Claude drafted the baseline, fine-tuning and comparison cells, testing all but the fine-tune in its own environment. I ran the full notebook on my iMac, which produced every number above, and Claude drafted the Step 2 write-up from those results.
-- **My decisions:**
-  - Resolve conflicting labels by majority vote and drop exact ties.
-  - Operating point: recall at precision ≥ 0.80, chosen on validation.
-  - Cost ratio: a missed disaster = 10 false alarms.
-  - Report precision at 1%, 5% and 10% prevalence rather than assume one rate.
-  - Fine-tune on my iMac's GPU rather than in Colab.
-  - Error-analysis guideline, including counting unplanned evacuations as 1, and my blind labels for the ten errors. Claude chose and shuffled the ten by the rule above and hid their labels and scores. I labelled them, Claude computed the verdicts from my labels, and I chose to leave #6 "unsure".
-- **§4 code and Step 3 text.** Claude drafted the selection and review cells and the Step 3 write-up from my labels and reasons.
-- **Steps 4, 5 and the event-grouping sketch.** Claude drafted these from the earlier research and the choices below. The API prices come from the providers' pages as of November 2026.
-  - Compare a commercial API model with a self-hosted open-weight model.
-  - Use an LLM, if it earns its cost, as a cascade adjudicator on the uncertain band.
-  - Start the real-system plan with the definition and a gold evaluation set.
-  - Include the optional event-grouping sketch.
+**What Claude did**
+
+- **Research.** Its research mode surveyed the dataset's provenance, published baselines on this data, the metric literature and LLM API prices; I used that to plan.
+- **Data inspection.** Through the Hugging Face connector, it found that the dataset is a single zip and confirmed it matches Kaggle's files.
+- **Code.** It drafted every notebook cell. It tested all of them except the fine-tune in its own environment; I ran the full notebook, including the fine-tune, on my iMac.
+- **Error-analysis logistics.** It picked the ten errors by the rule in Step 3, shuffled them and hid their labels and scores while I labelled them, then computed the verdicts from my labels.
+- **Writing.** It drafted this README from my decisions and results. I reviewed and edited it.
+
+**What I decided**
+
+- Resolve conflicting labels by majority vote and drop exact ties.
+- Operating point: recall at precision ≥ 0.80, chosen on validation.
+- Cost ratio: a missed disaster = 10 false alarms.
+- Report precision at 1%, 5% and 10% prevalence rather than assume one rate.
+- Fine-tune on my iMac's GPU rather than in Colab.
+- The error-analysis guideline, including counting unplanned evacuations as 1; my blind labels and reasons for the ten errors; and leaving #6 "unsure".
+- Step 4: compare a commercial API model with a self-hosted open-weight model, and use an LLM, if it earns its cost, only as a cascade adjudicator.
+- Step 5: start with the definition and a gold evaluation set from real traffic.
+- Include the optional event-grouping sketch.
