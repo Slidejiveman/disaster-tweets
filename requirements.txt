@@ -1,0 +1,11 @@
+# Core pipeline (sections 0-3)
+numpy>=2.0
+pandas>=2.2
+scikit-learn>=1.5
+scipy>=1.13
+matplotlib>=3.8
+huggingface_hub>=0.24
+jupyterlab>=4.2
+# Fine-tuning (section 2b); uses Apple Silicon (MPS) or CUDA when available
+torch>=2.4
+transformers>=4.44

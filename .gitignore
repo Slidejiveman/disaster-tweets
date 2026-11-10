@@ -1,0 +1,11 @@
+# data is downloaded from Hugging Face at run time
+data/
+# large model artifacts
+results/model/
+results/*.pt
+# python / jupyter
+__pycache__/
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
