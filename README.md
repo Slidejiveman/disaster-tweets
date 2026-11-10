@@ -20,7 +20,30 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 ## Step 1: Evaluation first
 
-*(in progress)*
+**The model is a triage layer, not the sender.** AlertMedia's analysts review threats before customers are alerted, and the AI Assistant requires a person to approve anything sent. So this classifier decides what analysts *see*, and that changes what each error costs.
+
+**What a false positive costs.** At the model layer, analyst minutes: a person reads a non-event and dismisses it. If false positives ever reached customers, the cost would be much higher. Recipients learn to ignore or mute alerts, which makes the *next real* alert more likely to be missed, and trust erodes in both the customer's security team and AlertMedia. Every false alarm lowers the value of every future alert.
+
+**What a false negative costs.** A threat to people that no analyst ever sees: a late or missing warning about a wildfire, flood or active shooter near a customer's site. These are rarer but heavy-tailed: possible injury, duty-of-care and liability exposure, and a customer who learns about the event from the news first. At this layer a false negative can't be recovered, because no one downstream gets a chance to catch it.
+
+**So the objective is maximum recall while the analyst queue stays useful.** Precision is a capacity constraint, not the goal.
+
+| Role | Metric | Why |
+| --- | --- | --- |
+| Headline, threshold-free | **Average precision (PR-AUC)**, with ROC-AUC alongside | Ranks how well real disasters rise to the top of the queue; focused on the positive class |
+| Operating point | **Recall at precision ≥ 0.80**, threshold chosen on validation | "Catch as many disasters as possible while at least 80% of what analysts see is real" |
+| Single-number summary | **F2**, plus F1 for comparison with published work | F2 weights recall twice as heavily as precision |
+| Business | **Expected cost per 1,000 tweets**, with a miss = 10 and a false alarm = 1 | Makes the trade-off explicit. The 10:1 ratio is an assumption to replace with real analyst time and incident-severity data. |
+| Trust in scores | **Brier score** and a reliability curve | Thresholds, cascades (Step 4) and analyst confidence all depend on a 0.9 meaning roughly 90% |
+| Uncertainty | **Bootstrap 95% intervals**; paired bootstrap and McNemar's test to compare models | Without intervals a small gain can't be told from noise |
+
+**Not accuracy.** With 41% positives, a model that never flags anything is still 59% accurate, and accuracy weights both errors equally, which is the opposite of this product's needs.
+
+**How thresholds are chosen.** On the validation split only, then applied unchanged to test, which is scored once per model. If the system ever sent alerts without a human in the loop, a false positive would cost far more and the operating point should move up.
+
+**Real-world prevalence.** This data is 41% disasters only because every tweet was found by a disaster-keyword search. Holding a model's recall and false-positive rate fixed, precision at prevalence π is recall·π / (recall·π + FPR·(1−π)). For example, 80% recall with a 10% false-positive rate gives 47% precision at 10% prevalence, 30% at 5%, and 7.5% at 1%. Step 2 reports this for both models.
+
+**Sanity check.** Each tweet's keyword alone, scored by that keyword's disaster rate in train, reaches an average precision of 0.758 on validation (chance is 0.408). Any real model has to clear that bar, and the README's Step 3 checks how much the models lean on the same shortcut.
 
 ## Step 2: Baseline and one improvement
 
@@ -61,4 +84,9 @@ I used Claude (Anthropic) as a research assistant and pair programmer. Running l
 - **Research.** Claude's research mode surveyed the dataset's provenance, published baselines on this data, the metric literature, and LLM API prices. I used it to plan; every number in this README comes from my own runs unless cited.
 - **Data inspection.** Through the Hugging Face connector, Claude found that the dataset is a single zip and confirmed it matches Kaggle's files.
 - **§0–§1 code.** Claude drafted the loading, normalization, deduplication and grouped-split cells.
-- **My decisions:** *(to fill in as we go)*
+- **§2 code and Step 1 text.** Claude drafted the evaluation harness and the Step 1 write-up from the choices below.
+- **My decisions:**
+  - Resolve conflicting labels by majority vote and drop exact ties.
+  - Operating point: recall at precision ≥ 0.80, chosen on validation.
+  - Cost ratio: a missed disaster = 10 false alarms.
+  - Report precision at 1%, 5% and 10% prevalence rather than assume one rate.
