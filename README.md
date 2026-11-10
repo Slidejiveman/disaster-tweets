@@ -89,7 +89,45 @@ At realistic prevalence either model would bury analysts in false alarms if it s
 
 ## Step 3: Error analysis
 
-*(to come)*
+**Method.** On test, the fine-tuned model makes 166 errors (92 missed disasters, 74 false alarms), against the baseline's 200. 69% of the fine-tune's errors are shared with the baseline.
+
+- **Sample:** 5 missed disasters and 5 false alarms, weighted toward misses because they matter most. In each group, the 3 most confident errors and the 2 nearest the threshold.
+- **Blind labelling:** before looking, I wrote a labelling guideline, then labelled the ten shuffled, without their official labels or scores:
+
+> **1** = the tweet reports a real, current event that threatens people or property, or an emergency response to one. Unplanned evacuations and lockdowns count as 1 even if the cause turns out to be false; drills and exercises are 0. **0** = figurative use, fiction, games, opinion, history, or no real event.
+
+- **Verdict:** if my label agrees with the model rather than the dataset, the error is label noise. If it agrees with the dataset, it's a model error. "Unsure" marks ambiguity in the definition itself.
+
+| # | Tweet (shortened) | Dataset | Fine-tune score | Mine | Verdict | Theme |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Ina Buted Girl Crush?? | 1 | 0.07 | 0 | label noise | nonsense / figurative |
+| 2 | …stand with Lucifer in all his flames of destruction | 1 | 0.07 | 0 | label noise | figurative |
+| 3 | Private thirsty night?SAD BLOOD ROCK'N ROLL? | 1 | 0.07 | 0 | label noise | nonsense / figurative |
+| 4 | annihilating quarterstaff of annihilation | 1 | 0.39 | 0 | label noise | game item |
+| 5 | Why weren't they taken back to Africa once rescued? | 1 | 0.38 | 0 | label noise | opinion about a news event |
+| 6 | Thief broke front window of Hicksville store, stole 50 cell phones; fled, crashed into… | 0 | 0.96 | unsure | ambiguous | crime / incident report |
+| 7 | Odeon cinema evacuated following false fire alarm | 0 | 0.95 | 1 | label noise | unplanned evacuation |
+| 8 | Mourning notices for stabbing arson victims stir "politics of grief" | 0 | 0.95 | 0 | model error | aftermath of a past attack |
+| 9 | …possibly he's had injuries on both ankles though. 2011 one worse | 0 | 0.39 | 0 | model error | sports chat |
+| 10 | Ashes 4th Test: 10 hilarious reactions to Australia's collapse | 0 | 0.39 | 0 | model error | sports metaphor |
+
+(The operating threshold is 0.389, so scores of 0.38–0.39 are near-misses.)
+
+**What they have in common**
+
+- **Every "missed disaster" is mislabeled under my guideline.** All five are nonsense, figurative rhetoric, a game item, or opinion, and both models agree with me on all five. The model's most confident misses aren't real misses, so measured recall understates the fine-tuned model.
+- **The confident "false alarms" describe real incidents:** an evacuation, a theft and crash, the aftermath of an attack. The dataset's idea of "disaster" is narrower than what a risk-intelligence product needs. Whether crime is in scope, and whether a report of a just-finished incident is still actionable (#6), are product decisions, not modelling ones.
+- **The genuine model errors are context-poor sports language near the threshold** ("collapse", "injuries"), which only the fine-tuned model gets wrong, plus a news story about a past attack (#8) that both models flag.
+- **Data quality:** mis-decoded characters ("Û÷politics of griefÛª") and HTML entities ("&amp;") survive in the raw text.
+
+**What I'd do about it**
+
+1. **Fix labels before changing models.** Score every training tweet out-of-fold and queue the confident disagreements for review, using confident learning (for example, cleanlab). On this evidence, relabelling would move the metrics more than a bigger model.
+2. **Settle the definition with analysts:** crime, evacuations, after-the-fact reports. This is item 1 of the two-week plan (Step 5).
+3. **For genuine model errors,** add sports and pop-culture negatives to training, or send the near-threshold band to an LLM adjudicator that knows "the Ashes" is cricket (the cascade in Step 4).
+4. **Repair text encoding** (for example, with ftfy) during normalization.
+
+**Limits.** Ten examples and one labeller give a direction, not a rate. To estimate the label-noise rate properly I'd have two people label a few hundred tweets and measure their agreement (Cohen's κ).
 
 ## Step 4: LLM evaluation harness
 
@@ -137,3 +175,5 @@ I used Claude (Anthropic) as a research assistant and pair programmer. Running l
   - Cost ratio: a missed disaster = 10 false alarms.
   - Report precision at 1%, 5% and 10% prevalence rather than assume one rate.
   - Fine-tune on my iMac's GPU rather than in Colab.
+  - Error-analysis guideline, including counting unplanned evacuations as 1, and my blind labels for the ten errors. Claude chose and shuffled the ten by the rule above and hid their labels and scores. I labelled them, Claude computed the verdicts from my labels, and I chose to leave #6 "unsure".
+- **§4 code and Step 3 text.** Claude drafted the selection and review cells and the Step 3 write-up from my labels and reasons.
