@@ -1,0 +1,108 @@
+{
+  "TF-IDF + LR": {
+    "threshold": 0.4699123861471976,
+    "avg_precision": {
+      "value": 0.8534,
+      "ci_low": 0.8232,
+      "ci_high": 0.8792
+    },
+    "roc_auc": {
+      "value": 0.8643,
+      "ci_low": 0.8388,
+      "ci_high": 0.886
+    },
+    "precision": {
+      "value": 0.7855,
+      "ci_low": 0.7441,
+      "ci_high": 0.824
+    },
+    "recall": {
+      "value": 0.7221,
+      "ci_low": 0.6782,
+      "ci_high": 0.7628
+    },
+    "f1": {
+      "value": 0.7525,
+      "ci_low": 0.7183,
+      "ci_high": 0.7828
+    },
+    "f2": {
+      "value": 0.7339,
+      "ci_low": 0.6967,
+      "ci_high": 0.7706
+    },
+    "brier": {
+      "value": 0.1399,
+      "ci_low": 0.1286,
+      "ci_high": 0.1523
+    },
+    "false_positive_rate": {
+      "value": 0.135,
+      "ci_low": 0.1079,
+      "ci_high": 0.1623
+    },
+    "cost_per_1k": {
+      "value": 1209.4595,
+      "ci_low": 1025.0241,
+      "ci_high": 1401.5685
+    },
+    "alerts_per_1k": {
+      "value": 373.5521,
+      "ci_low": 343.6293,
+      "ci_high": 403.4749
+    }
+  },
+  "Fine-tuned distilbert-base-uncased": {
+    "threshold": 0.3885634351925206,
+    "avg_precision": {
+      "value": 0.882,
+      "ci_low": 0.8572,
+      "ci_high": 0.904
+    },
+    "roc_auc": {
+      "value": 0.8878,
+      "ci_low": 0.8658,
+      "ci_high": 0.9067
+    },
+    "precision": {
+      "value": 0.8164,
+      "ci_low": 0.7797,
+      "ci_high": 0.8511
+    },
+    "recall": {
+      "value": 0.7815,
+      "ci_low": 0.7405,
+      "ci_high": 0.8184
+    },
+    "f1": {
+      "value": 0.7985,
+      "ci_low": 0.7687,
+      "ci_high": 0.8253
+    },
+    "f2": {
+      "value": 0.7882,
+      "ci_low": 0.7525,
+      "ci_high": 0.8196
+    },
+    "brier": {
+      "value": 0.1199,
+      "ci_low": 0.1068,
+      "ci_high": 0.1337
+    },
+    "false_positive_rate": {
+      "value": 0.1203,
+      "ci_low": 0.0964,
+      "ci_high": 0.1438
+    },
+    "cost_per_1k": {
+      "value": 959.4595,
+      "ci_low": 805.0193,
+      "ci_high": 1128.3784
+    },
+    "alerts_per_1k": {
+      "value": 388.9961,
+      "ci_low": 359.0734,
+      "ci_high": 417.9537
+    }
+  }
+}

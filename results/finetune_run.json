@@ -1,0 +1,13 @@
+{
+  "model": "distilbert-base-uncased",
+  "device": "mps",
+  "best_epoch": 2,
+  "epochs": 3,
+  "batch_size": 32,
+  "learning_rate": 3e-05,
+  "max_len": 64,
+  "transformers": "5.22.2",
+  "train_seconds": 154,
+  "torch": "2.15.0",
+  "machine": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+}
