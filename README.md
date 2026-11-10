@@ -71,6 +71,8 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 **At the same alert volume.** Each model runs at its own threshold, so on test they land at slightly different precision. As a like-for-like check (§3d), I gave both models the same budget, the baseline's 387 alerts out of 1,036 test tweets. The fine-tuned model's 387 contain 323 real disasters against the baseline's 304: **19 more real events for the same analyst workload** (95% paired-bootstrap interval +7 to +28), at precision 0.835 against 0.786.
 
+**Across training seeds.** The intervals above cover which tweets landed in the test set, not the randomness of training. Retraining with three more seeds (§3d) gives test average precision between 0.881 and 0.885 over the four runs (mean 0.883, sd 0.002) and recall at the operating point between 0.770 and 0.800 (mean 0.783, sd 0.013). The weakest seed still beats the baseline's 0.853 and 0.722, so the result doesn't depend on a lucky seed. Four runs is a small sample, enough to rule out a fluke but not to estimate the spread precisely.
+
 **Cost of the improvement.** Training took 154 seconds on my iMac's Apple Silicon GPU. Validation average precision by epoch was 0.885, 0.890 and 0.889, so the notebook kept epoch 2. Serving is one small-model forward pass per tweet, a small fraction of an LLM's per-tweet cost (Step 4); I'd measure its latency in shadow mode (Step 5).
 
 **Calibration.** The fitted temperature was 1.10, so the fine-tuned model was only slightly overconfident, and its Brier score is better than the baseline's. Both models track the diagonal of the reliability plot (`results/pr_reliability.png`) reasonably well.
