@@ -43,7 +43,7 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 **Real-world prevalence.** This data is 41% disasters only because every tweet was found by a disaster-keyword search. Holding a model's recall and false-positive rate fixed, precision at prevalence π is recall·π / (recall·π + FPR·(1−π)). For example, 80% recall with a 10% false-positive rate gives 47% precision at 10% prevalence, 30% at 5%, and 7.5% at 1%. Step 2 reports this for both models.
 
-**Sanity check.** Each tweet's keyword alone, scored by that keyword's disaster rate in train, reaches an average precision of 0.758 on validation (chance is 0.408). Any real model has to clear that bar, and the README's Step 3 checks how much the models lean on the same shortcut.
+**Sanity check.** Each tweet's keyword alone, scored by that keyword's disaster rate in train, reaches an average precision of 0.758 on validation (chance is 0.408). Any real model has to clear that bar, and Step 3 checks how much the models lean on the same shortcut.
 
 ## Step 2: Baseline and one improvement
 
