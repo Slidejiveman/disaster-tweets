@@ -227,7 +227,7 @@ jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeou
 
 ## AI tool use
 
-I used Claude (Anthropic) as a research assistant and pair programmer. Every number in this README comes from my own run of the notebook on my iMac, except where a source is cited.
+I used Claude Opus 5.5 (Anthropic) as a research assistant and pair programmer. **Time spent: about 1 hour, including planning with Claude.** Every number in this README comes from my own run of the notebook on my iMac, except where a source is cited.
 
 **What Claude did**
 
