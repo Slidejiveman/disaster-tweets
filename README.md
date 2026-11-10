@@ -69,6 +69,8 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 **What it means for an analyst queue.** At the same precision floor, per 1,000 tweets at this data's prevalence, the fine-tuned model flags about 318 real disasters against the baseline's 293, and about 71 false alarms against 80. So it catches roughly **24 more real events while sending analysts 9 fewer false alarms**.
 
+**At the same alert volume.** Each model runs at its own threshold, so on test they land at slightly different precision. As a like-for-like check (§3d), I gave both models the same budget, the baseline's 387 alerts out of 1,036 test tweets. The fine-tuned model's 387 contain 323 real disasters against the baseline's 304: **19 more real events for the same analyst workload** (95% paired-bootstrap interval +7 to +28), at precision 0.835 against 0.786.
+
 **Cost of the improvement.** Training took 154 seconds on my iMac's Apple Silicon GPU. Validation average precision by epoch was 0.885, 0.890 and 0.889, so the notebook kept epoch 2. Serving is one small-model forward pass per tweet, a small fraction of an LLM's per-tweet cost (Step 4); I'd measure its latency in shadow mode (Step 5).
 
 **Calibration.** The fitted temperature was 1.10, so the fine-tuned model was only slightly overconfident, and its Brier score is better than the baseline's. Both models track the diagonal of the reliability plot (`results/pr_reliability.png`) reasonably well.
@@ -227,7 +229,7 @@ jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeou
 
 ## AI tool use
 
-I used Claude Opus 5.5 (Anthropic) as a research assistant and pair programmer. **Time spent: about 1 hour, including planning with Claude.** Every number in this README comes from my own run of the notebook on my iMac, except where a source is cited.
+I used Claude Opus 5.5 (Anthropic) as a research assistant and pair programmer, then Claude Fable 5.2 to review the finished work; that review added the robustness checks in §3d. **Time spent: about 1 hour, including planning with Claude.** Every number in this README comes from my own run of the notebook on my iMac, except where a source is cited.
 
 **What Claude did**
 
