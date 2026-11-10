@@ -47,7 +47,35 @@ All code is in [`pipeline.ipynb`](pipeline.ipynb). Steps 1–3 are in the notebo
 
 ## Step 2: Baseline and one improvement
 
-*(to come)*
+**Baseline:** TF-IDF on word 1–2-grams plus character 2–5-grams, into logistic regression. Character n-grams pick up hashtags, misspellings and word fragments. Regularization (C = 2) was chosen on validation by average precision.
+
+**Improvement:** a fine-tuned DistilBERT (3 epochs, keeping the epoch with the best validation average precision), with temperature scaling fit on validation so its probabilities are calibrated. I chose fine-tuning over the other options because published work on this data ([kiran-bal](https://github.com/kiran-bal/disaster-tweet-classification)) puts a fine-tuned transformer about 4–5 F1 points above TF-IDF, while frozen sentence embeddings with logistic regression land within noise of it.
+
+**Results on the held-out test set** (1,036 tweets; thresholds chosen on validation for precision ≥ 0.80; 95% bootstrap intervals):
+
+| Metric | TF-IDF + LR | Fine-tuned DistilBERT |
+| --- | --- | --- |
+| Average precision | 0.853 [0.823, 0.879] | *(pending run)* |
+| ROC-AUC | 0.864 [0.839, 0.886] | |
+| Precision at operating point | 0.786 [0.744, 0.824] | |
+| Recall at operating point | 0.722 [0.678, 0.763] | |
+| F2 | 0.734 [0.697, 0.771] | |
+| F1 | 0.752 [0.718, 0.783] | |
+| Brier score (lower is better) | 0.140 [0.129, 0.152] | |
+| Expected cost per 1,000 tweets | 1,209 [1,025, 1,402] | |
+| Alerts per 1,000 tweets | 374 | |
+
+**Precision at real-world prevalence** (holding each model's test recall and false-positive rate fixed):
+
+| Prevalence | TF-IDF + LR | Fine-tuned DistilBERT |
+| --- | --- | --- |
+| 10% | 0.373 | |
+| 5% | 0.220 | |
+| 1% | 0.051 | |
+
+*(Comparison and interpretation after the fine-tune run.)*
+
+**A note on the operating point.** The baseline's threshold was chosen on validation to reach precision 0.80, and on test it lands at 0.786, with an interval that still includes 0.80. A threshold tuned on one sample drifts on the next, which is why production needs monitoring and periodic recalibration (Step 5).
 
 ## Step 3: Error analysis
 
