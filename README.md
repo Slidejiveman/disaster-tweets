@@ -91,12 +91,14 @@ At realistic prevalence either model would bury analysts in false alarms if it s
 
 **A note on the operating point.** The baseline's threshold was chosen on validation to reach precision 0.80, and on test it lands at 0.786, with an interval that still includes 0.80. A threshold tuned on one sample drifts on the next, which is why production needs monitoring and periodic recalibration (Step 5).
 
+**Why a precision floor and not minimum cost.** The threshold is set by the precision floor; the 10 : 1 cost is only reported. Taken alone, that cost would choose a threshold of about 0.09 (§3d), and on test the fine-tuned model would then flag 810 of every 1,000 tweets at precision 0.485 and recall 0.967. Its expected cost would be lower (552 against 959 per 1,000), but no analyst team could review that volume, and a queue that is half false alarms stops being trusted. So the floor stands in for analyst capacity, and I use expected cost to compare models at that workload. The fine-tuned model is also the cheaper one at the cost-minimizing threshold (552 against 588 for the baseline, with fewer alerts), so the choice of model doesn't depend on which rule sets the threshold. Both numbers are placeholders I would set with analysts and product.
+
 ## Step 3: Error analysis
 
 **Method.** On test, the fine-tuned model makes 166 errors (92 missed disasters, 74 false alarms), against the baseline's 200. 69% of the fine-tune's errors are shared with the baseline.
 
 - **Sample:** 5 missed disasters and 5 false alarms, weighted toward misses because they matter most. In each group, the 3 most confident errors and the 2 nearest the threshold.
-- **Blind labelling:** before looking, I wrote a labelling guideline, then labelled the ten shuffled, without their official labels or scores:
+- **Blind first pass:** before looking, I wrote a labelling guideline, then labelled the ten shuffled, without their official labels or scores:
 
 > **1** = the tweet reports a real, current event that threatens people or property, or an emergency response to one. Unplanned evacuations and lockdowns count as 1 even if the cause turns out to be false; drills and exercises are 0. **0** = figurative use, fiction, games, opinion, history, or no real event.
 
@@ -116,6 +118,8 @@ At realistic prevalence either model would bury analysts in false alarms if it s
 | 10 | Ashes 4th Test: 10 hilarious reactions to Australia's collapse | 0 | 0.39 | 0 | model error | sports metaphor |
 
 (The operating threshold is 0.389, so scores of 0.38–0.39 are near-misses.)
+
+**Two labels were revised after the reveal.** My first pass was blind. After seeing the official labels I changed two: #9 (ankle injuries) from 1 to 0, because on a second read I couldn't tell what event it described; and #6 (theft and crash) from 0 to "unsure", because my guideline doesn't settle whether an incident reported after the fact counts. On first-pass labels alone the tally is 7 label noise and 3 model error; the revisions lowered the label-noise count to 6. The five missed disasters were not changed.
 
 **What they have in common**
 
@@ -231,14 +235,14 @@ jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeou
 
 ## AI tool use
 
-I used Claude Opus 5.5 (Anthropic) as a research assistant and pair programmer, then Claude Fable 5.2 to review the finished work; that review added the robustness checks in §3d. **Time spent: about 1 hour, including planning with Claude.** Every number in this README comes from my own run of the notebook on my iMac, except where a source is cited.
+I used Claude Opus 5.5 (Anthropic) as a research assistant and pair programmer, then Claude Fable 5.2 to review the finished work; that review added the robustness checks in §3d, the cost-threshold comparison, and the note on the two revised labels in Step 3. **Time spent: about 1 hour, including planning with Claude.** Every number in this README comes from my own run of the notebook on my iMac, except where a source is cited.
 
 **What Claude did**
 
 - **Research.** Its research mode surveyed the dataset's provenance, published baselines on this data, the metric literature and LLM API prices; I used that to plan.
 - **Data inspection.** Through the Hugging Face connector, it found that the dataset is a single zip and confirmed it matches Kaggle's files.
 - **Code.** It drafted every notebook cell. It tested all of them except the fine-tune in its own environment; I ran the full notebook, including the fine-tune, on my iMac.
-- **Error-analysis logistics.** It picked the ten errors by the rule in Step 3, shuffled them and hid their labels and scores while I labelled them, then computed the verdicts from my labels.
+- **Error-analysis logistics.** It picked the ten errors by the rule in Step 3, shuffled them and hid their labels and scores while I labelled them, then revealed the official labels and computed the verdicts from my labels.
 - **Writing.** It drafted this README from my decisions and results. I reviewed and edited it.
 
 **What I decided**
@@ -248,7 +252,7 @@ I used Claude Opus 5.5 (Anthropic) as a research assistant and pair programmer, 
 - Cost ratio: a missed disaster = 10 false alarms.
 - Report precision at 1%, 5% and 10% prevalence rather than assume one rate.
 - Fine-tune on my iMac's GPU rather than in Colab.
-- The error-analysis guideline, including counting unplanned evacuations as 1; my blind labels and reasons for the ten errors; and leaving #6 "unsure".
+- The error-analysis guideline, including counting unplanned evacuations as 1; my labels and reasons for the ten errors (a blind first pass, with two revised after the reveal, as Step 3 describes).
 - Step 4: compare a commercial API model with a self-hosted open-weight model, and use an LLM, if it earns its cost, only as a cascade adjudicator.
 - Step 5: start with the definition and a gold evaluation set from real traffic.
 - Include the optional event-grouping sketch.
